@@ -1,0 +1,20 @@
+config {
+  type: "declaration",
+  database: "retailrocket-dw",
+  schema: "retailrocket_bronze",
+  name: "events"
+}
+
+config {
+  type: "declaration",
+  database: "retailrocket-dw",
+  schema: "retailrocket_bronze",
+  name: "category_tree"
+}
+
+config {
+  type: "declaration",
+  database: "retailrocket-dw",
+  schema: "retailrocket_bronze",
+  name: "item_properties"
+}
