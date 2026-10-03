@@ -20,5 +20,5 @@ FROM ${ref("bronze_events")}
 WHERE timestamp_ms IS NOT NULL 
 QUALIFY ROW_NUMBER() OVER (
     PARTITION BY timestamp_ms, visitorid, itemid, event
-    ORDER BY transactionid description
+    ORDER BY transactionid DESC
 ) = 1
