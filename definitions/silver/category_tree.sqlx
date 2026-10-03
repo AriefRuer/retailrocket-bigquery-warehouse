@@ -1,0 +1,9 @@
+config {
+    type: "table",
+    schema: "retailrocket_silver",
+    name: "silver_category_tree",
+    description: "Silver category tree: pass-through from bronze"
+}
+
+SELECT * 
+FROM ${ref("bronze_category_tree")}
