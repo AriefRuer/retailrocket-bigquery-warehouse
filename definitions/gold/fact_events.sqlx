@@ -1,0 +1,31 @@
+config {
+  type: "table",
+  schema: "retailrocket_gold",
+  name: "fact_events",
+  description: "Fact table: one row per user action (view, cart, transaction)",
+  bigquery: {
+    partitionBy: "date_sk",
+    clusterBy: ["user_sk", "item_sk"]
+  },
+  assertions: {
+    nonNull: ["event_sk", "date_sk", "user_sk", "item_sk", "event_type_sk"]
+  }
+}
+
+SELECT
+  FARM_FINGERPRINT(CONCAT(
+    CAST(e.visitorid AS STRING), '|',
+    CAST(e.timestamp_ms AS STRING), '|',
+    CAST(e.itemid AS STRING), '|',
+    e.event
+  )) AS event_sk,
+  dd.date_sk,
+  du.user_sk,
+  di.item_sk,
+  det.event_type_sk,
+  CAST(e.transactionid AS STRING) AS transactionid
+FROM ${ref("silver_events")} e
+JOIN ${ref("dim_date")}       dd ON DATE(e.event_timestamp) = dd.full_date
+JOIN ${ref("dim_users")}      du ON e.visitorid = du.visitorid
+JOIN ${ref("dim_items")}      di ON e.itemid    = di.itemid
+JOIN ${ref("dim_event_type")} det ON e.event    = det.event_type

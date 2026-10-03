@@ -1,0 +1,61 @@
+config {
+  type: "assertion",
+  schema: "retailrocket_gold",
+  description: "Business logic checks: event types, date range, transactionid rules"
+}
+
+SELECT 'event_type_count' AS check_name, CAST(COUNT(*) AS STRING) AS detail
+FROM ${ref("dim_event_type")}
+HAVING COUNT(*) != 3
+
+UNION ALL
+
+SELECT 'event_type_set', STRING_AGG(event_type ORDER BY event_type)
+FROM ${ref("dim_event_type")}
+HAVING STRING_AGG(event_type ORDER BY event_type) != 'addtocart,transaction,view'
+
+UNION ALL
+
+SELECT 'future_dates', CAST(COUNT(*) AS STRING)
+FROM ${ref("dim_date")}
+WHERE full_date > CURRENT_DATE()
+HAVING COUNT(*) > 0
+
+UNION ALL
+
+SELECT 'wrong_year', CAST(MIN(EXTRACT(YEAR FROM full_date)) AS STRING)
+FROM ${ref("dim_date")}
+HAVING MIN(EXTRACT(YEAR FROM full_date)) != 2015
+
+UNION ALL
+
+SELECT 'dow_out_of_range', CAST(MAX(day_of_week) AS STRING)
+FROM ${ref("dim_date")}
+HAVING MAX(day_of_week) > 7 OR MIN(day_of_week) < 1
+
+UNION ALL
+
+SELECT 'quarter_out_of_range', CAST(MAX(quarter) AS STRING)
+FROM ${ref("dim_date")}
+HAVING MAX(quarter) > 4 OR MIN(quarter) < 1
+
+UNION ALL
+
+SELECT 'min_events_per_user', CAST(MIN(total_events) AS STRING)
+FROM ${ref("dim_users")}
+HAVING MIN(total_events) < 1
+
+UNION ALL
+
+SELECT 'negative_item_ids', CAST(COUNT(*) AS STRING)
+FROM ${ref("dim_items")}
+WHERE itemid < 0
+HAVING COUNT(*) > 0
+
+UNION ALL
+
+SELECT 'transactionid_on_nontransaction', CAST(COUNT(*) AS STRING)
+FROM ${ref("fact_events")} f
+JOIN ${ref("dim_event_type")} det ON f.event_type_sk = det.event_type_sk
+WHERE det.event_type != 'transaction' AND f.transactionid IS NOT NULL
+HAVING COUNT(*) > 0

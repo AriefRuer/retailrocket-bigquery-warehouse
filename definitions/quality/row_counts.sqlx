@@ -1,0 +1,13 @@
+config {
+  type: "assertion",
+  schema: "retailrocket_gold",
+  description: "Fact table row count must equal silver events (1:1 grain preserved)"
+}
+
+SELECT
+  'fact_count_mismatch' AS check_name,
+  fact_count,
+  silver_count
+FROM (SELECT COUNT(*) AS fact_count FROM ${ref("fact_events")}) f
+CROSS JOIN (SELECT COUNT(*) AS silver_count FROM ${ref("silver_events")}) s
+WHERE fact_count != silver_count

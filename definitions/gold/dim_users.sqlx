@@ -1,0 +1,21 @@
+config {
+    type: "table",
+    schema: "retailrocket_gold",
+    name: "dim_users",
+    description: "User dimension with engagement metrics",
+    assertions:{
+        uniqueKey: ["user_sk"],
+        nonNull: ["user_sk", "visitorid"]
+    }
+}
+
+SELECT
+    FARM_FINGERPRINT(CAST(visitorid AS STRING)) AS user_sk,
+    visitorid,
+    MIN(event_timestamp) AS first_event_ts,
+    MAX(event_timestamp) AS last_event_ts,
+    COUNT(*) AS total_events,
+    COUNTIF(event = 'transaction') AS total_purchases,
+    COUNTIF(event = 'transaction') > 0 AS has_purchased
+FROM ${ref("silver_events")}
+GROUP BY visitorid
