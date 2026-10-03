@@ -1,0 +1,8 @@
+
+config {
+  type: "declaration",
+  database: "bigquery-retailrocket",
+  schema: "retailrocket_landing",
+  name: "category tree"
+}
+

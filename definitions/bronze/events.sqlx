@@ -1,0 +1,21 @@
+config {
+  type: "table",
+  schema: "retailrocket_bronze",
+  name: "bronze_events",
+  description: "Bronze events: typed, null visitorid/itemid removed",
+  assertions: {
+    nonNull: ["visitorid", "itemid"]
+  }
+}
+
+SELECT
+  timestamp,
+  CAST(timestamp AS INT64) AS timestamp_ms,
+  TIMESTAMP_MILLIS(CAST(timestamp AS INT64)) AS event_timestamp,
+  CAST(visitorid AS INT64) AS visitorid,
+  CAST(itemid AS INT64) AS itemid,
+  event,
+  CAST(transactionid AS INT64) AS transactionid
+FROM ${ref("events")}
+WHERE visitorid IS NOT NULL
+  AND itemid IS NOT NULL
