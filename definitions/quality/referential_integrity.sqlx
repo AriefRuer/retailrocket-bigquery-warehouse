@@ -7,7 +7,7 @@ config {
 WITH orphans AS (
   SELECT COUNT(*) AS orphan_count
   FROM ${ref("fact_events")} f
-  LEFT JOIN ${ref("dim_date")}       dd ON f.date_sk = dd.date_sk
+  LEFT JOIN ${ref("dim_date")}       dd ON f.event_date = dd.full_date
   LEFT JOIN ${ref("dim_users")}      du ON f.user_sk = du.user_sk
   LEFT JOIN ${ref("dim_items")}      di ON f.item_sk = di.item_sk
   LEFT JOIN ${ref("dim_event_type")} det ON f.event_type_sk = det.event_type_sk

@@ -10,7 +10,6 @@ config {
 }
 
 SELECT
-    CAST(FORMAT_DATE('%Y%m%d', full_date) AS INT64) AS date_sk,
     full_date,
     EXTRACT(YEAR FROM full_date) AS year,
     EXTRACT(MONTH FROM full_date) AS month,
