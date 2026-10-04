@@ -19,7 +19,7 @@ SELECT
     CAST(e.itemid AS STRING), '|',
     e.event
   )) AS event_sk,
-  DATE(e.event_timestamp) AS event_date 
+  DATE(e.event_timestamp) AS event_date, 
   du.user_sk,
   di.item_sk,
   det.event_type_sk,
