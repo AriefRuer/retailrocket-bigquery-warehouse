@@ -17,7 +17,7 @@ SELECT
     EXTRACT(DAY FROM full_date) AS day,
     EXTRACT(DAYOFWEEK FROM full_date) AS day_of_week,
     FORMAT_DATE('%A', full_date) AS day_name,
-    EXTRACT(DAYOFWEK FROM full_date) IN (1,7) AS is_weekend
+    EXTRACT(DAYOFWEEK FROM full_date) IN (1,7) AS is_weekend,
     FORMAT_DATE('%B',full_date) AS month_name,
     EXTRACT(QUARTER FROM full_date) as quarter
 FROM (
