@@ -1,0 +1,50 @@
+name: Dataform Recompile on Push
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  recompile:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write' # Required for Workload Identity Federation
+
+    steps:
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: 'google-github-actions/auth@v2'
+        with:
+          workload_identity_provider: 'projects/677323185031/locations/global/workloadIdentityPools/github-pool/providers/github-provider-alpha'
+          service_account: 'dataform-recompile-ci@bigquery-retailrocket.iam.gserviceaccount.com'
+
+      - name: Create New Compilation Result
+        id: create_compilation
+        run: |
+          ACCESS_TOKEN=$(gcloud auth print-access-token)
+          RESPONSE=$(curl -s -X POST \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://dataform.googleapis.com/v1beta1/projects/bigquery-retailrocket/locations/asia-southeast1/repositories/retailrocket-bigquery-dw/compilationResults" \
+            --data "{\"releaseConfig\":\"projects/bigquery-retailrocket/locations/asia-southeast1/repositories/retailrocket-bigquery-dw/releaseConfigs/production\"}")
+          
+          COMPILATION_RESULT=$(echo "$RESPONSE" | jq -r '.name')
+          echo "Created Compilation Result: $COMPILATION_RESULT"
+          echo "COMPILATION_RESULT=$COMPILATION_RESULT" >> $GITHUB_OUTPUT
+
+      - name: Wait for Compilation to be Ready
+        run: sleep 15 # Critical delay to avoid race condition
+
+      - name: Update Release Configuration
+        run: |
+          ACCESS_TOKEN=$(gcloud auth print-access-token)
+          COMPILATION_RESULT="${{ steps.create_compilation.outputs.COMPILATION_RESULT }}"
+          
+          curl -X PATCH \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data "{\"releaseCompilationResult\":\"$COMPILATION_RESULT\"}" \
+            "https://dataform.googleapis.com/v1beta1/projects/bigquery-retailrocket/locations/asia-southeast1/repositories/retailrocket-bigquery-dw/releaseConfigs/production"
