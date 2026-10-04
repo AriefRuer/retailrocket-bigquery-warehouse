@@ -4,8 +4,8 @@ config {
     name: "dim_date",
     description: "Date dimension with calendar attributes",
     assertions: {
-        uniqueKey: ["event_date"],
-        nonNull: ["event_date","full_date"]
+        uniqueKey: ["full_date"],
+        nonNull: ["full_date","full_date"]
     }
 }
 

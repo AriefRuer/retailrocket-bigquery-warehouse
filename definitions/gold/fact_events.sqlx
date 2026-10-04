@@ -8,7 +8,7 @@ config {
     clusterBy: ["user_sk", "item_sk"]
   },
   assertions: {
-    nonNull: ["event_sk", "date_sk", "user_sk", "item_sk", "event_type_sk"]
+    nonNull: ["event_sk", "event_date", "user_sk", "item_sk", "event_type_sk"]
   }
 }
 

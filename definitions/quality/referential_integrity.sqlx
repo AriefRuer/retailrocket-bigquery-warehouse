@@ -11,7 +11,7 @@ WITH orphans AS (
   LEFT JOIN ${ref("dim_users")}      du ON f.user_sk = du.user_sk
   LEFT JOIN ${ref("dim_items")}      di ON f.item_sk = di.item_sk
   LEFT JOIN ${ref("dim_event_type")} det ON f.event_type_sk = det.event_type_sk
-  WHERE dd.date_sk IS NULL
+  WHERE dd.full_date IS NULL
      OR du.user_sk IS NULL
      OR di.item_sk IS NULL
      OR det.event_type_sk IS NULL
