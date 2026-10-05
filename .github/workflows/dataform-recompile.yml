@@ -1,5 +1,5 @@
 name: Dataform Recompile on Push
-#2
+#5
 on:
   push:
     branches:
