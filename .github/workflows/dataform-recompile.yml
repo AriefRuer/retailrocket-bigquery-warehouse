@@ -1,5 +1,5 @@
 name: Dataform Recompile on Push
-
+#5
 on:
   push:
     branches:
@@ -11,14 +11,24 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: 'read'
-      id-token: 'write' # Required for Workload Identity Federation
+      id-token: 'write'   # Required for Workload Identity Federation
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Debug OIDC claims # OIDC debug
+        run: |
+          TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=google" | jq -r '.value')
+          echo "=== Decoded OIDC token claims ==="
+          echo "$TOKEN" | cut -d. -f2 | base64 -d 2>/dev/null | jq .
+
       - name: Authenticate to Google Cloud
         id: auth
         uses: 'google-github-actions/auth@v2'
         with:
-          workload_identity_provider: 'projects/677323185031/locations/global/workloadIdentityPools/github-pool/providers/github-provider-alpha'
+          workload_identity_provider: 'projects/677323185031/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider'
           service_account: 'dataform-recompile-ci@bigquery-retailrocket.iam.gserviceaccount.com'
 
       - name: Create New Compilation Result
@@ -30,19 +40,19 @@ jobs:
             -H "Content-Type: application/json" \
             "https://dataform.googleapis.com/v1beta1/projects/bigquery-retailrocket/locations/asia-southeast1/repositories/retailrocket-bigquery-dw/compilationResults" \
             --data "{\"releaseConfig\":\"projects/bigquery-retailrocket/locations/asia-southeast1/repositories/retailrocket-bigquery-dw/releaseConfigs/production\"}")
-          
+
           COMPILATION_RESULT=$(echo "$RESPONSE" | jq -r '.name')
           echo "Created Compilation Result: $COMPILATION_RESULT"
           echo "COMPILATION_RESULT=$COMPILATION_RESULT" >> $GITHUB_OUTPUT
 
       - name: Wait for Compilation to be Ready
-        run: sleep 15 # Critical delay to avoid race condition
+        run: sleep 15   # Critical delay to avoid race condition
 
       - name: Update Release Configuration
         run: |
           ACCESS_TOKEN=$(gcloud auth print-access-token)
           COMPILATION_RESULT="${{ steps.create_compilation.outputs.COMPILATION_RESULT }}"
-          
+
           curl -X PATCH \
             -H "Authorization: Bearer $ACCESS_TOKEN" \
             -H "Content-Type: application/json" \
