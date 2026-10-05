@@ -1,5 +1,5 @@
 name: Dataform Recompile on Push
-
+#fixed WIF setting errors
 on:
   push:
     branches:
