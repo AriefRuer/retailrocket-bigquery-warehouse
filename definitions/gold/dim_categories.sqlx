@@ -1,0 +1,16 @@
+config {
+    type: "table",
+    schema: "retailrocket_gold",
+    name: "dim_categories",
+    description: "Category dimension with parent hierarchy",
+    assertions: {
+        uniqueKey: ["category_sk"],
+        nonNull: ["category_sk", "category_id"]
+    }
+}
+
+SELECT
+    FARM_FINGERPRINT(CAST(categoryid AS STRING)) AS category_sk,
+    categoryid AS category_id,
+    parentid AS parent_id
+FROM ${ref("silver_category_tree")}

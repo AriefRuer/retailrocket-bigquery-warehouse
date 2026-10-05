@@ -1,0 +1,18 @@
+config {
+    type: "table",
+    schema: "retailrocket_gold",
+    name: "dim_event_type",
+    description: "Event type dimension (view, addtocart, transaction)",
+    assertions: {
+        uniqueKey: ["event_type_sk"],
+        nonNull: ["event_type_sk", "event_type"]
+    }
+}
+
+SELECT 
+    FARM_FINGERPRINT(event) AS event_type_sk,
+    event AS event_type
+FROM (
+    SELECT DISTINCT event
+    FROM ${ref("silver_events")}
+)

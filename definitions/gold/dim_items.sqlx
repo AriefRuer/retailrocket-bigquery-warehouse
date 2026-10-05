@@ -1,0 +1,38 @@
+config {
+  type: "table",
+  schema: "retailrocket_gold",
+  name: "dim_items",
+  description: "Item dimension with category and availability (SCD Type 1)",
+  assertions: {
+    uniqueKey: ["item_sk"],
+    nonNull: ["item_sk", "itemid"]
+  }
+}
+
+WITH latest_category AS (
+  SELECT itemid, CAST(value AS INT64) AS categoryid
+  FROM ${ref("silver_item_properties")}
+  WHERE property = 'categoryid'
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY itemid ORDER BY timestamp_ms DESC) = 1
+),
+
+latest_available AS (
+  SELECT itemid, CAST(value AS INT64) AS available_flag
+  FROM ${ref("silver_item_properties")}
+  WHERE property = 'available'
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY itemid ORDER BY timestamp_ms DESC) = 1
+),
+
+all_items AS (
+  SELECT DISTINCT itemid FROM ${ref("silver_events")}
+)
+
+SELECT
+  FARM_FINGERPRINT(CAST(ai.itemid AS STRING)) AS item_sk,
+  ai.itemid,
+  dc.category_sk,
+  COALESCE(la.available_flag, 0) AS is_available
+FROM all_items ai
+LEFT JOIN latest_category lc ON ai.itemid = lc.itemid
+LEFT JOIN latest_available la ON ai.itemid = la.itemid
+LEFT JOIN ${ref("dim_categories")} dc ON lc.categoryid = dc.category_id

@@ -1,0 +1,22 @@
+config {
+    type: "table",
+    schema: "retailrocket_silver",
+    name: "silver_item_properties",
+    description: "Silver item properties: filtered to categoryid/available, deduped on (itemid, property, timestamp_ms)",
+    assertions: {
+        nonNull: ["itemid", "property", "timestamp_ms"]
+    }
+}
+
+
+SELECT
+    itemid,
+    property,
+    value,
+    timestamp_ms
+FROM ${ref("bronze_item_properties")}
+WHERE property IN ('categoryid', 'available')
+QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY itemid, property, timestamp_ms
+    ORDER BY value
+) = 1

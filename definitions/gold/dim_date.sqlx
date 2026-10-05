@@ -1,0 +1,25 @@
+config {
+    type: "table",
+    schema: "retailrocket_gold",
+    name: "dim_date",
+    description: "Date dimension with calendar attributes",
+    assertions: {
+        uniqueKey: ["full_date"],
+        nonNull: ["full_date","full_date"]
+    }
+}
+
+SELECT
+    full_date,
+    EXTRACT(YEAR FROM full_date) AS year,
+    EXTRACT(MONTH FROM full_date) AS month,
+    EXTRACT(DAY FROM full_date) AS day,
+    EXTRACT(DAYOFWEEK FROM full_date) AS day_of_week,
+    FORMAT_DATE('%A', full_date) AS day_name,
+    EXTRACT(DAYOFWEEK FROM full_date) IN (1,7) AS is_weekend,
+    FORMAT_DATE('%B',full_date) AS month_name,
+    EXTRACT(QUARTER FROM full_date) as quarter
+FROM (
+    SELECT DISTINCT DATE(event_timestamp) AS full_date
+    FROM ${ref("silver_events")}
+)

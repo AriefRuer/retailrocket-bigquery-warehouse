@@ -1,0 +1,25 @@
+config {
+  type: "assertion",
+  schema: "retailrocket_gold",
+  description: "All primary keys must be unique"
+}
+
+SELECT
+  'duplicate_pk' AS check_name,
+  table_name,
+  total,
+  distinct_count
+FROM (
+  SELECT 'dim_date' AS table_name, COUNT(*) AS total, COUNT(DISTINCT full_date) AS distinct_count FROM ${ref("dim_date")}
+  UNION ALL
+  SELECT 'dim_users', COUNT(*), COUNT(DISTINCT user_sk) FROM ${ref("dim_users")}
+  UNION ALL
+  SELECT 'dim_items', COUNT(*), COUNT(DISTINCT item_sk) FROM ${ref("dim_items")}
+  UNION ALL
+  SELECT 'dim_categories', COUNT(*), COUNT(DISTINCT category_sk) FROM ${ref("dim_categories")}
+  UNION ALL
+  SELECT 'dim_event_type', COUNT(*), COUNT(DISTINCT event_type_sk) FROM ${ref("dim_event_type")}
+  UNION ALL
+  SELECT 'fact_events', COUNT(*), COUNT(DISTINCT event_sk) FROM ${ref("fact_events")}
+)
+WHERE total != distinct_count

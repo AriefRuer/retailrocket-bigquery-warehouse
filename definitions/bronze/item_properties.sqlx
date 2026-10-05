@@ -1,0 +1,14 @@
+config {
+  type: "table",
+  schema: "retailrocket_bronze",
+  name: "bronze_item_properties",
+  description: "Bronze item properties: timestamp cast to INT64 (ms)"
+}
+
+SELECT
+  itemid,
+  property,
+  value,
+  timestamp,
+  CAST(timestamp AS INT64) AS timestamp_ms
+FROM ${ref("item properties")}

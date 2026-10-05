@@ -1,0 +1,21 @@
+config {
+  type: "assertion",
+  schema: "retailrocket_gold",
+  description: "No orphan foreign keys in fact_events"
+}
+
+WITH orphans AS (
+  SELECT COUNT(*) AS orphan_count
+  FROM ${ref("fact_events")} f
+  LEFT JOIN ${ref("dim_date")}       dd ON f.event_date = dd.full_date
+  LEFT JOIN ${ref("dim_users")}      du ON f.user_sk = du.user_sk
+  LEFT JOIN ${ref("dim_items")}      di ON f.item_sk = di.item_sk
+  LEFT JOIN ${ref("dim_event_type")} det ON f.event_type_sk = det.event_type_sk
+  WHERE dd.full_date IS NULL
+     OR du.user_sk IS NULL
+     OR di.item_sk IS NULL
+     OR det.event_type_sk IS NULL
+)
+SELECT 'orphan' AS check_name, orphan_count
+FROM orphans
+WHERE orphan_count > 0
