@@ -8,7 +8,7 @@ config {
     clusterBy: ["user_sk", "item_sk"]
   },
   assertions: {
-    nonNull: ["event_sk", "event_date", "user_sk", "item_sk", "event_type_sk"]
+    nonNull: ["event_sk", "event_date", "event_timestamp", "user_sk", "item_sk", "event_type_sk"]
   }
 }
 
@@ -19,7 +19,8 @@ SELECT
     CAST(e.itemid AS STRING), '|',
     e.event
   )) AS event_sk,
-  DATE(e.event_timestamp) AS event_date, 
+  DATE(e.event_timestamp) AS event_date,
+  e.event_timestamp AS event_timestamp,   
   du.user_sk,
   di.item_sk,
   det.event_type_sk,
