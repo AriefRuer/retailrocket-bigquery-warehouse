@@ -49,6 +49,78 @@ flowchart LR
 | Gold | `retailrocket_gold` | Star schema: 5 dimensions + 1 fact table | Dataform SQLX |
 | Quality | `retailrocket_dataform_assertions` | Data-quality checks as assertion views | Dataform assertions |
 
+## Dataform models — file by file
+
+Every transformation is a `.sqlx` file (SQL + a `config` block) under `dataform/definitions/`.
+Dataform resolves the `${ref("...")}` dependencies automatically and runs the layers in order.
+19 files total: 3 declarations, 9 transformation models, 6 gold models, 4 assertions
+(the quality folder overlaps — see below).
+
+### Sources (3) — declare what already exists in BigQuery
+
+These don't build anything; they register the landing tables so `${ref()}` can point at them.
+
+| File | Declares | Notes |
+|---|---|---|
+| `sources/raw_events.sqlx` | `retailrocket_landing.events` | 2.76M rows |
+| `sources/raw_category_tree.sqlx` | `retailrocket_landing."category tree"` | Note the space in the physical table name — the declaration must match it exactly |
+| `sources/raw_item_properties.sqlx` | `retailrocket_landing."item properties"` | 20.3M rows, also has a space |
+
+> One `config` block per file — Dataform's compiler silently drops all but one if you stack them.
+
+### Bronze (3) — typing and hard filtering
+
+Bronze is where the raw `bq load` output gets a **correct, enforced schema**. Nothing is
+deduplicated yet.
+
+| File | Output table | What it does |
+|---|---|---|
+| `bronze/events.sqlx` | `retailrocket_bronze.bronze_events` | Casts all columns to explicit types; converts the 13-digit epoch-ms `timestamp` into a real `TIMESTAMP` (`TIMESTAMP_MILLIS`) + keeps `timestamp_ms`; **drops rows with null `visitorid` or `itemid`** (unattributable events); inline `nonNull` assertions |
+| `bronze/category_tree.sqlx` | `retailrocket_bronze.bronze_category_tree` | Pass-through (`SELECT *`) — the file is a typed placeholder so the layer graph is complete |
+| `bronze/item_properties.sqlx` | `retailrocket_bronze.bronze_item_properties` | Casts `timestamp` to `INT64` (`timestamp_ms`); keeps `value` as STRING (it holds both category IDs and availability flags) |
+
+### Silver (3) — cleansing and conformance
+
+Silver removes duplicates and narrows the property change-log to what the model actually uses.
+
+| File | Output table | What it does |
+|---|---|---|
+| `silver/events.sqlx` | `retailrocket_silver.silver_events` | **Dedupes** on `(timestamp_ms, visitorid, itemid, event)` using `QUALIFY ROW_NUMBER() ... = 1` (orders by `transactionid DESC` so the row carrying a transaction survives); filters null timestamps; inline `nonNull` assertions |
+| `silver/category_tree.sqlx` | `retailrocket_silver.silver_category_tree` | Pass-through from bronze |
+| `silver/item_properties.sqlx` | `retailrocket_silver.silver_item_properties` | **Filters the property change-log to `categoryid` and `available` only** (the other ~dozens of properties are unused); dedupes on `(itemid, property, timestamp_ms)` |
+
+### Gold (6) — the star schema
+
+| File | Output table | What it does |
+|---|---|---|
+| `gold/dim_date.sqlx` | `retailrocket_gold.dim_date` | Calendar dimension built from **distinct event dates** in silver (138 days, May–Sep 2015). `full_date` (DATE) is the PK — Kimball's natural-key exception. Adds `year`, `month`, `day`, `day_of_week`, `day_name`, `is_weekend`, `month_name`, `quarter` |
+| `gold/dim_users.sqlx` | `retailrocket_gold.dim_users` | One row per visitor. `user_sk = FARM_FINGERPRINT(visitorid)`; aggregates first/last event timestamps, `total_events`, `total_purchases`, and a `has_purchased` flag |
+| `gold/dim_items.sqlx` | `retailrocket_gold.dim_items` | One row per item **seen in events** (not the full catalog). Pulls the **latest** `categoryid` and `available` flag per item from the silver change-log (`QUALIFY ROW_NUMBER() ... ORDER BY timestamp_ms DESC`), COALESCEs missing availability to 0, joins the category SK. This is **SCD Type 1** (latest state wins, no history) |
+| `gold/dim_categories.sqlx` | `retailrocket_gold.dim_categories` | Category dimension with the `parent_id` hierarchy from the category tree; `category_sk = FARM_FINGERPRINT(categoryid)` |
+| `gold/dim_event_type.sqlx` | `retailrocket_gold.dim_event_type` | Tiny conformed dimension: the 3 distinct event types (`view`, `addtocart`, `transaction`) with hashed SKs |
+| `gold/fact_events.sqlx` | `retailrocket_gold.fact_events` | **The fact table — one row per user action.** `event_sk` = fingerprint of `(visitorid, timestamp_ms, itemid, event)`; `event_date` = `DATE(event_timestamp)`; **INNER JOINs** all four dimensions (date, user, item, event type). Declares `PARTITION BY event_date` + `CLUSTER BY user_sk, item_sk` in the `bigquery` config block, plus `nonNull` assertions on all keys |
+
+> **Why INNER JOIN:** every dimension derives from `silver_events`, so matches are guaranteed.
+> If one ever isn't, the `row_counts` assertion fails loudly — surfacing the bug instead of
+> silently dropping fact rows.
+
+### Quality (4) — custom assertions
+
+Each compiles into a **view** in `retailrocket_dataform_assertions` that returns rows only
+when something is wrong (empty result = pass). Dataform runs them automatically after the
+models they reference.
+
+| File | Check |
+|---|---|
+| `quality/row_counts.sqlx` | `COUNT(fact_events)` must equal `COUNT(silver_events)` — proves the 1:1 grain survived the fact build |
+| `quality/unique_keys.sqlx` | `COUNT(*) = COUNT(DISTINCT pk)` for all 6 gold tables — catches duplicate surrogate/date keys |
+| `quality/referential_integrity.sqlx` | LEFT JOINs the fact table against all 4 dimensions and fails if any FK is orphaned |
+| `quality/business_logic.sqlx` | Domain rules in one UNION ALL view: exactly 3 event types, correct type set, no future dates, date starts in 2015, day-of-week/quarter in range, no negative item IDs, no `transactionid` on non-transaction events |
+
+In addition to these 4 custom files, **built-in assertions** (`uniqueKey`, `nonNull`) are
+declared inline in each model's `config` block — those compile into auto-named views in the
+default assertion dataset.
+
 ## Data model (gold)
 
 ```
