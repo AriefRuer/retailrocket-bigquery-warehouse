@@ -39,7 +39,7 @@ jobs:
             -H "Authorization: Bearer $ACCESS_TOKEN" \
             -H "Content-Type: application/json" \
             "https://dataform.googleapis.com/v1beta1/projects/bigquery-retailrocket/locations/asia-southeast1/repositories/retailrocket-bigquery-dw/compilationResults" \
-            --data "{\"releaseConfig\":\"projects/bigquery-retailrocket/locations/asia-southeast1/repositories/retailrocket-bigquery-dw/releaseConfigs/production\"}")
+            --data "{\"releaseConfig\":\"projects/bigquery-retailrocket/locations/asia-southeast1/repositories/retailrocket-bigquery-dw/releaseConfigs/production-with-verify\"}")
 
           COMPILATION_RESULT=$(echo "$RESPONSE" | jq -r '.name')
           echo "Created Compilation Result: $COMPILATION_RESULT"
