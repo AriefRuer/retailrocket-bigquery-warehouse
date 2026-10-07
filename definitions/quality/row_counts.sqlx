@@ -1,6 +1,6 @@
 config {
   type: "assertion",
-  schema: "retailrocket_gold",
+  schema: "retailrocket_dataform_assertions",
   description: "Fact table row count must equal silver events (1:1 grain preserved)"
 }
 
