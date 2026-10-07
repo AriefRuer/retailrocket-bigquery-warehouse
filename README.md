@@ -49,14 +49,14 @@ flowchart LR
 | Gold | `retailrocket_gold` | Star schema: 5 dimensions + 1 fact table | Dataform SQLX |
 | Quality | `retailrocket_dataform_assertions` | Data-quality checks as assertion views | Dataform assertions |
 
-## Dataform models — file by file
+## Dataform models and what they do
 
 Every transformation is a `.sqlx` file (SQL + a `config` block) under `dataform/definitions/`.
 Dataform resolves the `${ref("...")}` dependencies automatically and runs the layers in order.
 19 files total: 3 declarations, 9 transformation models, 6 gold models, 4 assertions
 (the quality folder overlaps — see below).
 
-### Sources (3) — declare what already exists in BigQuery
+### Sources (3): declare what already exists in BigQuery
 
 These don't build anything; they register the landing tables so `${ref()}` can point at them.
 
@@ -66,12 +66,11 @@ These don't build anything; they register the landing tables so `${ref()}` can p
 | `sources/raw_category_tree.sqlx` | `retailrocket_landing."category tree"` | Note the space in the physical table name — the declaration must match it exactly |
 | `sources/raw_item_properties.sqlx` | `retailrocket_landing."item properties"` | 20.3M rows, also has a space |
 
-> One `config` block per file — Dataform's compiler silently drops all but one if you stack them.
+> One `config` block per file, initial versions of the pipeline revealed that Dataform's compiler silently drops all but one if you stack them into a single file.
 
-### Bronze (3) — typing and hard filtering
+### Bronze (3): typing and hard filtering
 
-Bronze is where the raw `bq load` output gets a **correct, enforced schema**. Nothing is
-deduplicated yet.
+The bronze layer cast types and drops null rows.
 
 | File | Output table | What it does |
 |---|---|---|
@@ -79,7 +78,7 @@ deduplicated yet.
 | `bronze/category_tree.sqlx` | `retailrocket_bronze.bronze_category_tree` | Pass-through (`SELECT *`) — the file is a typed placeholder so the layer graph is complete |
 | `bronze/item_properties.sqlx` | `retailrocket_bronze.bronze_item_properties` | Casts `timestamp` to `INT64` (`timestamp_ms`); keeps `value` as STRING (it holds both category IDs and availability flags) |
 
-### Silver (3) — cleansing and conformance
+### Silver (3): cleansing and conformance
 
 Silver removes duplicates and narrows the property change-log to what the model actually uses.
 
@@ -89,7 +88,7 @@ Silver removes duplicates and narrows the property change-log to what the model 
 | `silver/category_tree.sqlx` | `retailrocket_silver.silver_category_tree` | Pass-through from bronze |
 | `silver/item_properties.sqlx` | `retailrocket_silver.silver_item_properties` | **Filters the property change-log to `categoryid` and `available` only** (the other ~dozens of properties are unused); dedupes on `(itemid, property, timestamp_ms)` |
 
-### Gold (6) — the star schema
+### Gold (6): the star schema
 
 | File | Output table | What it does |
 |---|---|---|
