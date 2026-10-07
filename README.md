@@ -1,9 +1,9 @@
 # RetailRocket: A BigQuery Data Warehouse for Real-World e-commerce business data.
 
 An end-to-end, fully serverless data warehouse on **Google Cloud**, built from a public
-e-commerce clickstream dataset. Raw CSVs land in Cloud Storage, pass through a
+real-world e-commerce clickstream dataset. Raw CSVs first land in Cloud Storage, then it passes through a
 **medallion architecture** (landing → bronze → silver → gold) orchestrated by
-**Dataform**, and surface as a **Kimball star schema** in BigQuery — ready for BI.
+**Dataform**, and surface as a **Kimball star schema** in BigQuery which can be easily connected to a BI layer.
 
 | | |
 |---|---|
@@ -13,19 +13,17 @@ e-commerce clickstream dataset. Raw CSVs land in Cloud Storage, pass through a
 | **BI** | Power BI (Import mode via the native BigQuery connector) |
 | **Dataset** | [RetailRocket](https://www.kaggle.com/retailrocket/retailrocket-ecommerce-dataset) — e-commerce events, May–Sep 2015 |
 | **Scale** | ~23M rows / ~900 MB raw (2.76M events, 20.3M item-property rows, 1,669 categories) |
-| **Cost** | $0 — runs entirely within the BigQuery free tier (1 TiB queries + 10 GiB storage / month) |
+| **Cost** | $0 as it runs entirely within the BigQuery free tier (1 TiB queries + 10 GiB storage / month) |
 
 ## Why this project
 
-This warehouse is a rebuild. The same star-schema design was first implemented on
-Azure (Blob → Databricks PySpark → Azure SQL), but the **Azure for Students
-subscription expired**, cutting off access to every Azure service — the pipeline
-could no longer be managed, let alone completed. The data engineering itself was
-sound; the platform underneath it disappeared.
+This project serves as a challenge to build an end-to-end data engineering & analytics platform for BI analytics on a modern cloud platform. Instead of just creating a dashboard, this project starts with the engineering of a data warehouse layer to serve a reusable, secure, reproducible, resilient and modern data pipeline for the business intelligence inside of the dashboard downstream. The warehouse uses a star-schema design which was first implemented on
+Microsoft Azure (Blob → Databricks PySpark → Azure SQL), but the **Azure for Students
+subscription expired**, cutting off access to every Azure service. Since the pipeline
+could no longer be managed, the data engineering foundation was migrated to use BigQuery and Dataform.
 
 The design was migrated to Google Cloud, where BigQuery is **fully serverless**:
-no clusters, no autotermination, no node quotas, no subscription that can lapse on
-a student tier. The star schema, grain, and cleansing rules were carried over
+On Azure, managing a cluster proved difficult due to a limited subscription. However, The star schema, grain, and cleansing rules were carried over
 unchanged; only the platform-specific code was rewritten (PySpark → Dataform SQLX,
 ADF → Dataform workflows, service-account keys → Workload Identity Federation).
 
@@ -127,13 +125,13 @@ Landing-layer loads were validated against the Kaggle-documented row counts:
 | `category_tree` | 1,669 | 1,669 | ✅ |
 | `item_properties` | 20,275,902 | 20,275,902 | ✅ |
 
-Header-row handling was confirmed two ways: exact row-count match, and `INTEGER`
+Header-row handling was confirmed using two ways: exact row-count match, and `INTEGER`
 column types (a stray header row would have forced `STRING`).
 
 ## Downstream analytics
 
 The gold layer feeds a Power BI model via the native BigQuery connector in
-**Import mode** — chosen deliberately: the dataset is a fixed historical snapshot,
+**Import mode** which was chosen deliberately: the dataset is a fixed historical snapshot,
 and importing once protects the BigQuery query free tier. A **conversion-funnel
 dashboard implementation is currently in the works** (funnel: views → add-to-cart
 → transactions, built on `fact_events` + `dim_event_type`), with customer
