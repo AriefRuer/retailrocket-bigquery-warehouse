@@ -100,14 +100,13 @@ Silver removes duplicates and narrows the property change-log to what the model 
 | `gold/fact_events.sqlx` | `retailrocket_gold.fact_events` | **The fact table — one row per user action.** `event_sk` = fingerprint of `(visitorid, timestamp_ms, itemid, event)`; `event_date` = `DATE(event_timestamp)`; **INNER JOINs** all four dimensions (date, user, item, event type). Declares `PARTITION BY event_date` + `CLUSTER BY user_sk, item_sk` in the `bigquery` config block, plus `nonNull` assertions on all keys |
 
 > **Why INNER JOIN:** every dimension derives from `silver_events`, so matches are guaranteed.
-> If one ever isn't, the `row_counts` assertion fails loudly — surfacing the bug instead of
-> silently dropping fact rows.
+> If one ever isn't, the `row_counts` assertion fails loudly and the bug is surfaced for analysts to see instead of
+> filling with NULLs while keeping row_count identical to the source of truth, which makes failures harder to detect.
 
-### Quality (4) — custom assertions
+### Quality (4): custom assertions
 
 Each compiles into a **view** in `retailrocket_dataform_assertions` that returns rows only
-when something is wrong (empty result = pass). Dataform runs them automatically after the
-models they reference.
+when something is wrong (empty result = pass). This serve as a validation and verification check which is executed by Dataform workflows after the rest of the pipeline. 
 
 | File | Check |
 |---|---|
