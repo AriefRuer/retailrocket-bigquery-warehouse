@@ -1,6 +1,6 @@
 config {
   type: "assertion",
-  schema: "retailrocket_gold",
+  schema: "retailrocket_dataform_assertions",
   description: "No orphan foreign keys in fact_events"
 }
 
