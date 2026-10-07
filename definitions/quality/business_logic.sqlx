@@ -1,6 +1,6 @@
 config {
   type: "assertion",
-  schema: "retailrocket_assertions",
+  schema: "retailrocket_dataform_assertions",
   description: "Business logic checks: event types, date range, transactionid rules"
 }
 
