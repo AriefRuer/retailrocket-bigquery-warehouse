@@ -28,11 +28,11 @@ Power BI  (conversion-funnel dashboard — in the works)
 
 ---
 
-## Dataset — What RetailRocket Is
+## Dataset: What RetailRocket Is
 
-[RetailRocket](https://www.kaggle.com/datasets/retailrocket/ecommerce-dataset) is an anonymized **clickstream log from a real-world e-commerce website**, published by Retail Rocket (retailrocket.io), a real-time product-recommendation platform, for one stated purpose: *"to motivate researchers in the field of recommender systems with implicit feedback."* In plain terms: it records what visitors actually **did** on a shop — which pages they viewed, what they added to cart, what they bought — rather than what the shop sold. It is the raw signal a recommender system would learn from, not a sales ledger.
+[RetailRocket](https://www.kaggle.com/datasets/retailrocket/ecommerce-dataset) is an anonymized **clickstream log from a real-world e-commerce website**, published by Retail Rocket (retailrocket.io), a real-time product-recommendation platform, for one stated purpose: *"to motivate researchers in the field of recommender systems with implicit feedback."* In plain terms: it records the actions visitors actually **did** on a shop; which pages they viewed, what they added to cart, what they bought. It is the raw signal a recommender system would learn from.
 
-The log is **raw — no content transformations — with all values hashed for confidentiality.** Only two properties survive readable: `categoryid` and `available`. Everything else (prices, text, brands) is hashed (`n5.000`-style numbers, stemmed-then-hashed words), so no price or product-name analysis is possible — by design of the publisher, not of this pipeline. About 90% of events have matching rows in the properties file.
+The log is **raw — no content transformations — with all values hashed for confidentiality.** Only two properties survive readable: `categoryid` and `available`. Everything else (prices, text, brands) is hashed (`n5.000`-style numbers, stemmed-then-hashed words), so no price or product-name analysis is possible which is by design of the publisher, not of this pipeline. About 90% of events have matching rows in the properties file.
 
 **Three files, 987.5 MB total (Kaggle v2):**
 
@@ -42,8 +42,8 @@ The log is **raw — no content transformations — with all values hashed for c
 | `item_properties_part1+2.csv` | 20,275,902 | 893 MB | **Change log** of item attributes over time (originally weekly snapshots, >200M rows — the publisher merged consecutive constant values, cutting it ~10×) |
 | `category_tree.csv`           | 1,669      | 14 KB  | Category hierarchy in child→parent form (empty parent = root)                                                                                             |
 
-**Event types:** `view` (2,664,312) · `addtocart` (69,332) · `transaction` (22,457) — note the spelling; the dataset writes it as one word.
-**Coverage:** May 3 – September 18, 2015 (4.5 months) — 139 calendar dates with activity (a 138-day elapsed span), 1,407,580 unique visitors, 417,053 unique items in the properties file.
+**Event types:** `view` (2,664,312) · `addtocart` (69,332) · `transaction` (22,457)
+**Coverage:** May 3 – September 18, 2015 (4.5 months) -> 139 calendar dates with activity (a 138-day elapsed span), 1,407,580 unique visitors, 417,053 unique items in the properties file.
 **License:** [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) — stated on the Kaggle dataset page.
 **Publisher's own caveat:** their dataset tasks note that browsing logs can contain *"up to 40% abnormal traffic"* which is exactly why this pipeline profiles the heavy-visitor tail before any per-user analysis (see Analyst Notes).
 
@@ -55,7 +55,7 @@ One fact table at the grain of a single user action, five conformed dimensions, 
 
 | Table            | Grain                     | Notable columns                                                                              |
 | ---------------- | ------------------------- | -------------------------------------------------------------------------------------------- |
-| `dim_date`       | One row per calendar date | 139 rows — year, month, day, day-of-week, `day_name`, `is_weekend`, month name, quarter      |
+| `dim_date`       | One row per calendar date | 139 rows; year, month, day, day-of-week, `day_name`, `is_weekend`, month name, quarter      |
 | `dim_users`      | One row per visitor       | `visitorid`, first/last event timestamps, `total_events`, `total_purchases`, `has_purchased` |
 | `dim_items`      | One row per item          | `itemid`, `category_sk` (NULL when no category — see below), `is_available`                  |
 | `dim_categories` | One row per category      | `category_id`, `parent_id`                                                                   |
@@ -64,7 +64,7 @@ One fact table at the grain of a single user action, five conformed dimensions, 
 
 ---
 
-## Dataform Models — File by File
+## Dataform Models: File by File
 
 19 files: 3 source declarations, 12 table models (3 bronze, 3 silver, 6 gold), 4 assertion suites.
 
@@ -94,7 +94,7 @@ One fact table at the grain of a single user action, five conformed dimensions, 
 
 ---
 
-## Transformations by Layer — What and Why
+## Transformations by Layer: What and Why
 
 Each layer answers one question. Landing: *did the files arrive intact?* Bronze: *are the types trustworthy?* Silver: *is every row one real, unique event?* Gold: *does this answer a business question?*
 
@@ -112,9 +112,9 @@ Each layer answers one question. Landing: *did the files arrive intact?* Bronze:
 
 | Transformation                                                                                                                                  | Why                                                                                                                                                                                                                                                                                                                                                                           |
 | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `WHERE timestamp_ms IS NOT NULL`                                                                                                                | An event without a time cannot be placed on the date dimension — unusable for a time-series warehouse.                                                                                                                                                                                                                                                                        |
-| Dedup: `QUALIFY ROW_NUMBER() OVER (PARTITION BY timestamp_ms, visitorid, itemid, event ORDER BY transactionid DESC) = 1` (`silver/events.sqlx`) | The natural identity of an event is *(when, who, what item, what action)* — a repeat of that tuple is a logging artifact, not a second real-world action. **Verified: removes 460 rows (0.017%).** The `ORDER BY transactionid DESC` tie-break keeps the row that carries a `transactionid` over a null duplicate — this is why all 22,457 transactions survive dedup intact. |
-| `WHERE property IN ('categoryid', 'available')` + dedup on `(itemid, property, timestamp_ms)` (`silver/item_properties.sqlx`)                   | Of 20,275,902 property rows, everything except these two keys is hashed and analytically opaque (publisher's design). Filtering keeps only what can be read: **2,291,853 rows (11.3%)** — a 20M-row wall becomes a joinable attribute source.                                                                                                                                 |
+| `WHERE timestamp_ms IS NOT NULL`                                                                                                                | An event without a time cannot be placed on the date dimension, unusable for a time-series warehouse.                                                                                                                                                                                                                                                                        |
+| Dedup: `QUALIFY ROW_NUMBER() OVER (PARTITION BY timestamp_ms, visitorid, itemid, event ORDER BY transactionid DESC) = 1` (`silver/events.sqlx`) | The natural identity of an event is *(when, who, what item, what action)* a repeat of that tuple is a logging artifact. **Verified: removes 460 rows (0.017%).** The `ORDER BY transactionid DESC` tie-break keeps the row that carries a `transactionid` over a null duplicate — this is why all 22,457 transactions survive dedup intact. |
+| `WHERE property IN ('categoryid', 'available')` + dedup on `(itemid, property, timestamp_ms)` (`silver/item_properties.sqlx`)                   | Of 20,275,902 property rows, everything except these two keys is hashed and analytically opaque (publisher's design). Filtering keeps only what can be read: **2,291,853 rows (11.3%)** a 20M-row wall becomes a joinable attribute source.                                                                                                                                 |
 | Inline assertions: `nonNull` on `visitorid, itemid, timestamp_ms, event`                                                                        | Guards the grain definition itself — a NULL in any of these four means the dedup key is broken, so the model refuses to build.                                                                                                                                                                                                                                                |
 
 ### Silver → Gold: star schema, deterministic keys, fail-loud joins
@@ -134,7 +134,7 @@ Four assertion models (`definitions/quality/`) run after every build: **`row_cou
 
 ---
 
-## Data Integrity — Verified
+## Data Integrity: Verified
 
 Layer counts were **recomputed locally from the full Kagggle CSVs** (987.5 MB) using the same cleaning rules the SQL applies, then cross-checked against the production BigQuery/Azure SQL tables:
 
@@ -163,7 +163,7 @@ The raw 987.5 MB corpus was profiled before any transformation was written. What
 
 ## What This Model Can Answer
 
-The warehouse is designed for these questions — no findings are asserted here, only capabilities the schema supports:
+The warehouse is designed for these questions, no findings are asserted here as of now (PowerBI Dashboard will answer an angle from these questions), but these are the capabilities the schema supports:
 
 - View → add-to-cart → transaction funnel rates, by category, item, user segment, or time period
 - Repeat-purchase behaviour per user (`has_purchased`, purchase counts in `dim_users`)
@@ -171,7 +171,7 @@ The warehouse is designed for these questions — no findings are asserted here,
 - Event volume patterns across the 139-day window (daily/weekly rhythm, weekends via `is_weekend`)
 - Item popularity and category mix shifts over the covered period
 
-## CI/CD — Keyless Deployment
+## CI/CD: Keyless Deployment
 
 `.github/workflows/dataform-recompile.yml` recompiles and runs every Dataform model and assertion on each push to `main`, using **Workload Identity Federation (OIDC)** to authenticate to Google Cloud — no stored service-account keys, no secrets in the repository. Failed assertions fail the build.
 
@@ -203,7 +203,7 @@ retailrocket-bigquery-warehouse/
 1. Upload the three CSVs from [Kaggle](https://www.kaggle.com/datasets/retailrocket/ecommerce-dataset) to a GCS bucket
 2. Set project/dataset/bucket in `bronze/load_landing.sh`, run it, then run `bronze/verify_counts.sql` (all three rows must say PASS)
 3. Point `workflow_settings.yaml` at your project, `dataform compile`, then run the models in order
-4. Push to `main` — the GitHub Actions workflow recompiles everything (requires one-time Workload Identity Federation setup between GitHub and GCP)
+4. Push to `main` the GitHub Actions workflow recompiles everything (requires one-time Workload Identity Federation setup between GitHub and GCP)
 
 ## Cost
 
@@ -211,4 +211,4 @@ retailrocket-bigquery-warehouse/
 
 ## Related
 
-The earlier Azure build of this warehouse — [azure-databricks-datawarehouse](https://github.com/AriefRuer/azure-databricks-datawarehouse) — documents the same star schema on Databricks/PySpark, including the surrogate-key and orphan-item bugs whose fixes are carried forward here.
+The earlier Azure build of this warehouse — [azure-databricks-datawarehouse](https://github.com/AriefRuer/azure-databricks-datawarehouse) documents the same star schema on Databricks/PySpark, including the surrogate-key and orphan-item bugs whose fixes are carried forward here.
