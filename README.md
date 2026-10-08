@@ -17,9 +17,9 @@ real-world e-commerce clickstream dataset. Raw CSVs first land in Cloud Storage,
 
 ## The dataset
 
-[RetailRocket](https://www.kaggle.com/datasets/retailrocket/ecommerce-dataset) is an anonymized clickstream log from a real-world e-commerce website, published by Retail Rocket (retailrocket.io), a real-time product-recommendation platform, for one stated purpose: "to motivate researchers in the field of recommender systems with implicit feedback." In plain terms: it records what visitors actually did on a shop, which pages they viewed, what they added to cart, what they bought, rather than what the shop sold. It is raw signal from one shop, not a sales ledger.
+[RetailRocket](https://www.kaggle.com/datasets/retailrocket/ecommerce-dataset) is an anonymized clickstream log from a real-world e-commerce website, published by Retail Rocket (retailrocket.io), a real-time product-recommendation platform, for one stated purpose: "to motivate researchers in the field of recommender systems with implicit feedback." In plain terms: it records what visitors actually did on the online website, which pages they viewed, what they added to cart, what they bought, rather than purely transactions. 
 
-The log is raw, with all values hashed for confidentiality. Only two properties survive readable: `categoryid` and `available`. Everything else (prices, text, brands) is hashed, so no price or product-name analysis is possible. That is the publisher's design, not a limitation of this pipeline.
+The log is raw, with all values hashed for confidentiality. Only two properties remain readable: `categoryid` and `available`. Everything else (prices, text, brands) is hashed by design, so no price or product-name analysis is possible. That is the data publisher's design, and is not a limitation of this pipeline.
 
 | File | Rows | Size | What it holds |
 |---|---:|---:|---|
@@ -73,15 +73,13 @@ flowchart LR
   I["Dataform workflow<br/>(scheduled config)"] -.-> E
 ```
 
-The three Kaggle CSVs are uploaded once to a Cloud Storage bucket (`gs://retailrocket_raw/retailrocket/`, note the underscores). Through the Google Cloud Console, the raw files are then ingested into the landing dataset in BigQuery. From there Dataform takes over. During development, each push goes to `dev`. After the whole medallion build is finished, `dev` is merged into `main` through a pull request, and that merge triggers GitHub Actions. The workflow authenticates without any stored key and asks the Dataform API to recompile and run every model and assertion. The layers build in order, landing to bronze to silver to gold, and a failed assertion stops the build. Everything in solid lines is built and running today. The Power BI node is planned; it does not exist yet.
-
-## Tech stack and what each tool does
+The three Kaggle CSVs are uploaded once to a Cloud Storage bucket (`gs://retailrocket_raw/retailrocket/`, note the underscores). Through the Google Cloud Console, the raw files are then ingested into the landing dataset in BigQuery. From there Dataform takes over. During development, each push goes to `dev`. After the whole medallion build is finished, `dev` is merged into `main` through a pull request, and that merge triggers GitHub Actions. The workflow authenticates without any stored key and asks the Dataform API to automatically recompile so that every scheduled workflow runs on up-to-date schemas. The layers build in order, landing to bronze to silver to gold, and a failed assertion stops the build. The Power BI node is planned for future implementation.
 
 | Tool | What it does here |
 |---|---|
 | Google Cloud Storage | Holds the raw CSVs as the initial landing zone |
 | BigQuery | The warehouse itself. Stores every layer and serves queries. Serverless, which is the reason the project could survive losing the Azure subscription |
-| Dataform | Writes and orchestrates all transformations as SQLX files with a dependency graph. Replaces the Azure notebooks and Azure Data Factory from the predecessor project (PySpark became Dataform SQLX, ADF became Dataform workflows) |
+| Dataform | Writes and orchestrates all transformations as SQLX files with a dependency graph. Replaces Databricks and Azure Data Factory from the predecessor project (PySpark became Dataform SQLX, ADF became Dataform workflows) |
 | Dataform assertions | The four quality checks that run after every build. Replaces the manual verification notebook of the Azure build |
 | GitHub Actions with Workload Identity Federation (OIDC) | Recompiles and runs Dataform on every push to `main`. Uses short-lived tokens instead of service-account keys, so no secret exists in the repository. Replaces the PAT-based workflow of the Azure build |
 | `workflow_settings.yaml` | Dataform project defaults: project ID, target datasets, core version |
