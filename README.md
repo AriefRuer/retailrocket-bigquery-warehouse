@@ -2,9 +2,9 @@
 
 An end-to-end data warehouse built on Google Cloud, using the [RetailRocket e-commerce dataset](https://www.kaggle.com/datasets/retailrocket/ecommerce-dataset). The pipeline ingests the raw CSVs into BigQuery, transforms them through a medallion architecture (bronze → silver → gold) with **Dataform**, and models the result as a **Kimball star schema** (5 dimensions + 1 fact) ready for BI consumption. A Power BI conversion-funnel dashboard implementation is currently in the works.
 
-**Why BigQuery:** this project began on Azure (see the predecessor: [azure-databricks-datawarehouse](https://github.com/AriefRuer/azure-databricks-datawarehouse)). When the Azure for Students subscription expired on 30 September 2026, cutting off access mid-project, the entire warehouse was rebuilt serverless on Google Cloud — no clusters to provision, no idle cost, and it runs entirely inside the GCP free tier (**1 TiB of queries + 10 GiB of storage per month**, free-tier limits verified 8 October 2026).
+**Why BigQuery:** this project began on Azure (see the predecessor: [azure-databricks-datawarehouse](https://github.com/AriefRuer/azure-databricks-datawarehouse)). When the Azure for Students subscription expired, it cut off my access to manage the entire project, hence the entire warehouse was rebuilt serverless on Google Cloud; no clusters to provision, no idle cost, and it runs entirely inside the GCP free tier (**1 TiB of queries + 10 GiB of storage per month**.
 
-**Stack:** Google Cloud Storage · BigQuery · Dataform · GitHub Actions (Workload Identity Federation) · Power BI *(planned)*
+**Stack:** Google Cloud Storage · BigQuery · Dataform · GitHub Actions (Workload Identity Federation) · Power BI *(WIP)*
 
 ---
 
@@ -45,7 +45,7 @@ The log is **raw — no content transformations — with all values hashed for c
 **Event types:** `view` (2,664,312) · `addtocart` (69,332) · `transaction` (22,457) — note the spelling; the dataset writes it as one word.
 **Coverage:** May 3 – September 18, 2015 (4.5 months) — 139 calendar dates with activity (a 138-day elapsed span), 1,407,580 unique visitors, 417,053 unique items in the properties file.
 **License:** [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) — stated on the Kaggle dataset page.
-**Publisher's own caveat:** their dataset tasks note that browsing logs can contain *"up to 40% abnormal traffic"* — which is exactly why this pipeline profiles the heavy-visitor tail before any per-user analysis (see Analyst Notes).
+**Publisher's own caveat:** their dataset tasks note that browsing logs can contain *"up to 40% abnormal traffic"* which is exactly why this pipeline profiles the heavy-visitor tail before any per-user analysis (see Analyst Notes).
 
 ---
 
@@ -96,7 +96,7 @@ One fact table at the grain of a single user action, five conformed dimensions, 
 
 ## Transformations by Layer — What and Why
 
-Each layer answers one question. Landing: *did the bytes arrive intact?* Bronze: *are the types trustworthy?* Silver: *is every row one real, unique event?* Gold: *does this answer a business question?*
+Each layer answers one question. Landing: *did the files arrive intact?* Bronze: *are the types trustworthy?* Silver: *is every row one real, unique event?* Gold: *does this answer a business question?*
 
 ### Landing → Bronze: type enforcement, nothing dropped
 
