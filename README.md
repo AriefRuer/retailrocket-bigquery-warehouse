@@ -20,7 +20,7 @@ A fully serverless data warehouse on **Google Cloud**, built from a public e-com
 
 This project serves as a challenge to build an end-to-end data engineering and analytics platform for BI analytics on a modern cloud platform. Instead of just creating a dashboard, this project starts with the engineering of a data warehouse layer to serve a reusable, secure, reproducible, resilient and modern data pipeline for the business intelligence inside of the dashboard downstream. The warehouse uses a star-schema design which was first implemented on Microsoft Azure (Blob → Databricks PySpark → Azure SQL), but the **Azure for Students subscription expired**, cutting off access to every Azure service. Since the pipeline could no longer be managed, the data engineering foundation was migrated to use BigQuery and Dataform.
 
-The design was migrated to Google Cloud, where BigQuery is **fully serverless**. On Azure, managing a cluster proved difficult because of the limited subscription. The star schema, grain, and cleansing rules were carried over unchanged; only the platform-specific code was rewritten (PySpark → Dataform SQLX, ADF → Dataform workflows, service-account keys → Workload Identity Federation).
+The design was migrated to Google Cloud, where BigQuery is **fully serverless**. On Azure, managing a cluster proved difficult because of the limited subscription. The star schema, grain, and cleansing rules were carried over unchanged; only the platform-specific code was rewritten (PySpark → Dataform SQLX, ADF → Dataform workflows, a stored Databricks personal access token → Workload Identity Federation).
 
 ## Architecture
 
@@ -32,7 +32,7 @@ flowchart LR
   C --> D["silver<br/>(deduped, conformed)"]
   D --> E["gold<br/>(star schema)"]
   E --> F["Power BI<br/>(planned, not built)"]
-  G["GitHub Actions<br/>(WIF / OIDC)"] -.->|push to main| H["Dataform API<br/>(recompile + assertions)"]
+  G["GitHub Actions<br/>(WIF / OIDC)"] -.->|push to main| H["Dataform API<br/>(recompile release config)"]
   I["Dataform workflow<br/>(scheduled config)"] -.-> E
 ```
 
@@ -48,8 +48,8 @@ flowchart LR
 | Google Cloud Storage | Holds the raw CSVs as the first landing zone |
 | BigQuery | The warehouse itself. Stores every layer and answers queries. Being serverless is why the project survived losing the Azure subscription |
 | Dataform | Writes and runs all transformations as SQLX files, in dependency order. Replaces Databricks and Azure Data Factory from the Azure build (PySpark became SQLX, ADF became Dataform workflows) |
-| Dataform assertions | Four quality checks that run after every build. Replace the manual check notebook from the Azure build |
-| GitHub Actions with Workload Identity Federation (OIDC) | Recompiles and runs Dataform on every push to `main`. Uses short-lived tokens instead of service-account keys, so no secret is stored in the repo. Replaces the PAT-based workflow of the Azure build |
+| Dataform assertions | Four quality checks that run with every Dataform workflow run. Replace the manual check notebook from the Azure build |
+| GitHub Actions with Workload Identity Federation (OIDC) | Recompiles the production release configuration on every push to `main`. It does not run the pipeline or the assertions. Uses short-lived tokens instead of service-account keys, so no secret is stored in the repo. Replaces the PAT-based workflow of the Azure build |
 | `workflow_settings.yaml` | Dataform defaults: project ID, target datasets, core version |
 | Power BI (planned) | Would read the gold tables through the BigQuery connector in Import mode. Not built yet |
 
@@ -173,7 +173,7 @@ erDiagram
 
 ## Data quality checks
 
-Dataform runs four checks (`definitions/quality/`) after every build. Each one is a view that returns rows only when something is wrong, so an empty result means a pass. A failed check fails the GitHub Actions build. Inline `nonNull` and `uniqueKey` rules also stop any model with a null key from building.
+Dataform runs four checks (`definitions/quality/`) as part of every workflow run (scheduled or manual). Each one is a view that returns rows only when something is wrong, so an empty result means a pass. A failed check fails that Dataform workflow run. GitHub Actions does not run the checks; it only recompiles the release configuration. Inline `nonNull` and `uniqueKey` rules also stop any model with a null key from building.
 
 | Check | What it tests | Mistake it prevents |
 |---|---|---|
@@ -200,6 +200,30 @@ Dataform runs four checks (`definitions/quality/`) after every build. Each one i
 - **Purchase:** an event with `event = 'transaction'` (22,457), each with a `transactionid`.
 - **Avoid double counting:** join the fact table to the lookup tables, never to the item-properties change log, which turns one event into many rows.
 
+## Known limitations
+
+These are gaps between the design and what the code does, plus normal design limits. The code is left as it is; they are documented here.
+
+**CI/CD and orchestration**
+
+- **GitHub Actions only recompiles.** `dataform-recompile.yml` creates a new compilation and points the `production-with-verify` release configuration at it. It does not start a workflow run, so it never runs the models or the assertions, and it does not run on pull requests.
+- **The workflow is not defensive.** It waits a fixed 15 seconds instead of checking the compilation status, does not check the API responses for errors, and still has a debug step that prints the decoded OIDC token claims (not a secret, but noise).
+- **The schedule is not in the repo.** The Dataform workflow configuration lives in the Google Cloud console, so its schedule cannot be shown from GitHub.
+
+**Naming and scripts**
+
+- **Landing table names contain spaces.** The live landing tables, the Dataform source declarations and the exported DDL use `category tree` and `item properties`. `bronze/load_landing.sh` uses underscore names, so a fresh load with the script would not match the declarations without renaming one side.
+- **`bronze/load_landing.sh` calls itself `load_bronze.sh`** in its header and usage line.
+
+**Design limits**
+
+- **SCD Type 1 loses history.** Every past event is reported under the item's latest category.
+- **`is_available` treats unknown as unavailable.** `COALESCE(..., 0)` turns a missing value into 0, so "never reported" and "out of stock" look the same.
+- **Full rebuild on every run.** All models are `table` type; there are no incremental loads.
+- **One-level category tree.** `dim_categories` holds only the direct parent; rolling up to a top-level category needs a recursive query.
+- **Static historical dataset.** There is no live source, so scheduling only proves the pipeline can re-run.
+- **No dashboards yet.** The Power BI layer is planned, not built.
+
 <details>
 <summary>CI/CD with keyless login</summary>
 
@@ -219,7 +243,7 @@ retailrocket-bigquery-warehouse/
 ├── README.md
 ├── workflow_settings.yaml          # Dataform: project, datasets, core version
 ├── .github/workflows/
-│   └── dataform-recompile.yml      # CI: recompile + assertions via OIDC (keyless)
+│   └── dataform-recompile.yml      # CI: recompile release config via OIDC (keyless)
 ├── dataform/
 │   └── dataform.json
 ├── bronze/                         # Record of the initial load
