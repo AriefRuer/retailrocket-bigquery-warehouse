@@ -24,7 +24,7 @@ All three tables loaded via the BigQuery Console GUI on 17 September 2026.
 
 **Destination dataset:** Load jobs recorded `retailrocket_bronze` as the destination, reflecting the state at job run time. The tables were subsequently copied to `retailrocket_landing`, which is where they now live. The job metadata is historical and immutable — the mismatch is expected.
 
-**Table names:** Two tables were initially created with spaces (`"category tree"`, `"item properties"`) instead of underscores. The current dataset contains the intended underscore names.
+**Table names:** Two tables were created with spaces (`"category tree"`, `"item properties"`) instead of underscores, and they still have those names. The Dataform source declarations (`definitions/sources/`) and the exported DDL (`warehouse/schema/landing.sql`) reference the spaced names. `load_landing.sh` uses the intended underscore names (`category_tree`, `item_properties`), so it does not match the live tables.
 
 **Bucket path:** The actual GCS path is `gs://retailrocket_raw/retailrocket/`. Earlier drafts of the migration plan referenced `gs://retailrocket-raw/` — the underscore-vs-hyphen difference is a documentation correction, not a data issue.
 
@@ -38,9 +38,9 @@ All three tables loaded via the BigQuery Console GUI on 17 September 2026.
 
 | File | Purpose |
 |---|---|
-| `load_bronze.sh` | Reproduces the GUI load via `bq load` — reflects the intended state, not the exact GUI clicks |
+| `load_landing.sh` | Reproduces the GUI load via `bq load` — reflects the intended state (underscore table names), not the exact GUI clicks. Its header still calls it `load_bronze.sh` |
 | `verify_counts.sql` | Validates all three tables against Kaggle-documented row counts |
 
 ## Re-running
 
-`load_bronze.sh` uses `WRITE_EMPTY` — it will fail if the target tables exist. To re-run, drop the tables first or change the write disposition to `WRITE_TRUNCATE`.
+`load_landing.sh` uses `WRITE_EMPTY` — it will fail if the target tables exist. To re-run, drop the tables first or change the write disposition to `WRITE_TRUNCATE`.
